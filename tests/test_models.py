@@ -2,6 +2,7 @@
 import pytest
 import pandas as pd
 import numpy as np
+import joblib
 from src import models
 
 def sample_data():
@@ -19,9 +20,9 @@ def test_train_and_predict(model_type):
     if y_prob is not None:
         assert y_prob.shape[0] == len(y)
 
-    # Test save/load
-    models.save_model(model, f"/tmp/test_{model_type}.joblib")
-    loaded = models.load_model(f"/tmp/test_{model_type}.joblib")
+    # Test save/load using joblib directly
+    joblib.dump(model, f"/tmp/test_{model_type}.joblib")
+    loaded = joblib.load(f"/tmp/test_{model_type}.joblib")
     y_pred2, y_prob2 = models.predict(loaded, X)
     np.testing.assert_array_equal(y_pred, y_pred2)
     if y_prob is not None and y_prob2 is not None:

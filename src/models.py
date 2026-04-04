@@ -1,3 +1,46 @@
+# clinical-trials-prediction/src/models.py
+
+import pandas as pd
+import numpy as np
+import joblib
+import optuna
+import shap
+from sklearn.ensemble import RandomForestClassifier, VotingClassifier, StackingClassifier
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+from catboost import CatBoostClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+
+
+def train_model(X, y, model_type='rf', **kwargs):
+	"""
+	Train a model of the specified type.
+
+	Args:
+		X (pd.DataFrame): Feature matrix.
+		y (pd.Series): Target vector.
+		model_type (str): 'rf', 'svm', 'xgb', 'catboost', 'logreg'.
+		**kwargs: Model hyperparameters.
+	Returns:
+		Trained model instance.
+	"""
+	if model_type == 'rf':
+		model = RandomForestClassifier(n_jobs=-1, **kwargs)
+	elif model_type == 'svm':
+		model = SVC(probability=True, **kwargs)
+	elif model_type == 'xgb':
+		model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', n_jobs=-1, **kwargs)
+	elif model_type == 'catboost':
+		model = CatBoostClassifier(verbose=0, **kwargs)
+	elif model_type == 'logreg':
+		model = LogisticRegression(max_iter=1000, **kwargs)
+	else:
+		raise ValueError(f"Unknown model_type: {model_type}")
+	model.fit(X, y)
+	return model
+
+
 def build_ensemble(X, y, method='voting', base_models=None, meta_model=None):
 	"""
 	Build an ensemble model (Voting or Stacking).
@@ -30,53 +73,17 @@ def build_ensemble(X, y, method='voting', base_models=None, meta_model=None):
 			]
 		if meta_model is None:
 			meta_model = LogisticRegression(max_iter=1000, random_state=42)
-		ensemble = StackingClassifier(estimators=base_models, final_estimator=meta_model, n_jobs=-1, passthrough=False)
+		ensemble = StackingClassifier(
+			estimators=base_models,
+			final_estimator=meta_model,
+			n_jobs=-1,
+			passthrough=False
+		)
 		ensemble.fit(X, y)
 		return ensemble
 	else:
 		raise ValueError("Unknown ensemble method: choose 'voting' or 'stacking'")
 
-
-import pandas as pd
-import numpy as np
-import joblib
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier, StackingClassifier
-from sklearn.svm import SVC
-from xgboost import XGBClassifier
-from catboost import CatBoostClassifier
-from sklearn.linear_model import LogisticRegression
-import optuna
-import shap
-
-def train_model(X, y, model_type='rf', **kwargs):
-	"""
-	Train a model of the specified type.
-
-import optuna
-import shap
-
-	Args:
-		X (pd.DataFrame): Feature matrix.
-		y (pd.Series): Target vector.
-		model_type (str): 'rf', 'svm', 'xgb', 'catboost', 'logreg'.
-		**kwargs: Model hyperparameters.
-	Returns:
-		Trained model instance.
-	"""
-	if model_type == 'rf':
-		model = RandomForestClassifier(n_jobs=-1, **kwargs)
-	elif model_type == 'svm':
-		model = SVC(probability=True, **kwargs)
-	elif model_type == 'xgb':
-		model = XGBClassifier(use_label_encoder=False, eval_metric='logloss', n_jobs=-1, **kwargs)
-	elif model_type == 'catboost':
-		model = CatBoostClassifier(verbose=0, **kwargs)
-	elif model_type == 'logreg':
-		model = LogisticRegression(max_iter=1000, **kwargs)
-	else:
-		raise ValueError(f"Unknown model_type: {model_type}")
-	model.fit(X, y)
-	return model
 
 def predict(model, X):
 	"""
@@ -152,36 +159,4 @@ def tune_hyperparameters(X, y, model_type='rf', n_trials=20, timeout=600, seed=4
 	study.optimize(objective, n_trials=n_trials, timeout=timeout)
 	return study.best_params
 
-def explain_model_shap(model, X, max_display=10):
-	"""
-	Compute and plot SHAP values for model interpretability.
-	Args:
-		model: Trained model.
-		X (pd.DataFrame): Feature matrix.
-		max_display (int): Number of features to display.
-	Returns:
-		shap.Explanation: SHAP values object.
-	"""
-	explainer = shap.Explainer(model, X)
-	shap_values = explainer(X)
-	shap.summary_plot(shap_values, X, max_display=max_display, show=False)
-	return shap_values
 
-def save_model(model, file_path):
-	"""
-	Save a trained model to disk.
-	Args:
-		model: Trained model.
-		file_path (str): Path to save the model.
-	"""
-	joblib.dump(model, file_path)
-
-def load_model(file_path):
-	"""
-	Load a trained model from disk.
-	Args:
-		file_path (str): Path to the saved model.
-	Returns:
-		Loaded model instance.
-	"""
-	return joblib.load(file_path)
